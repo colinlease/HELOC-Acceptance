@@ -57,7 +57,7 @@ Before training the model, data cleaning was done by explicitly handling credit-
 
 ### Applicant-facing denial explanation (Gemini)
 - If a Gemini API key is configured, the backend calls Gemini to produce an applicant-friendly denial explanation.
-- When the model returns `DENY`, the app sends Gemini a structured explanation_package containing the applicant’s processed inputs plus the model-derived denial drivers (feature contributions) and required output/constraints so Gemini can write a borrower-friendly denial explanation.
+- When the model returns `DENY`, the app sends Gemini a structured `explanation_package` containing the applicant’s processed inputs plus the model-derived denial drivers (feature contributions) and required output/constraints so Gemini can write a borrower-friendly denial explanation.
 - If Gemini does not return an explanation, the app shows a friendly warning message.
 
 ### Admin diagnostics returned by the backend
