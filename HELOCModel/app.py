@@ -1,0 +1,235 @@
+# app.py
+from __future__ import annotations
+
+import pandas as pd
+import streamlit as st
+
+from backend import load_artifacts, score_application
+
+st.set_page_config(page_title="HELOC DSS", layout="wide")
+st.title("HELOC Automated Application Portal")
+
+# ------------------------------------------------------------
+# Cache model artifacts
+# ------------------------------------------------------------
+@st.cache_resource
+def get_artifacts():
+    return load_artifacts()
+
+pipeline, metadata, feature_desc = get_artifacts()
+raw_fields = list(metadata["raw_input_features_order"])
+
+# Gemini key from Streamlit secrets (preferred) or env var fallback
+gemini_api_key = None
+if "GEMINI_API_KEY" in st.secrets:
+    gemini_api_key = st.secrets["GEMINI_API_KEY"]
+
+# ------------------------------------------------------------
+# Main-page input method selector (no sidebar)
+# ------------------------------------------------------------
+st.subheader("Step 1: Provide applicant data")
+mode = st.radio(
+    "Input method",
+    ["Upload CSV/XLSX", "Manual entry"],
+    index=0,
+    horizontal=True,
+)
+
+if not gemini_api_key:
+    st.warning(
+        "Explanations are currently unavailable because the application is missing its explanation service key. "
+        "You can still score applications."
+    )
+
+
+# ------------------------------------------------------------
+# Input builders
+# ------------------------------------------------------------
+def manual_entry_ui() -> dict:
+    st.subheader("Enter your credit information manually")
+    st.caption("Enter raw values exactly as the template expects. Special codes like -7, -8, -9 are allowed.")
+
+    # Curated groups for a consumer-friendly manual entry experience
+    FIELD_GROUPS: list[tuple[str, str, list[str], bool]] = [
+        (
+            "Credit score / overall risk",
+            "Your overall credit risk estimate.",
+            ["ExternalRiskEstimate"],
+            True,
+        ),
+        (
+            "Credit history length / age of file",
+            "How long you’ve had credit accounts and how recently they’ve been opened.",
+            [
+                "MSinceOldestTradeOpen",
+                "MSinceMostRecentTradeOpen",
+                "AverageMInFile",
+            ],
+            False,
+        ),
+        (
+            "Delinquencies + public records",
+            "Late payments, derogatory events, and severity of delinquencies.",
+            [
+                "NumTrades60Ever2DerogPubRec",
+                "NumTrades90Ever2DerogPubRec",
+                "MSinceMostRecentDelq",
+                "MaxDelq2PublicRecLast12M",
+                "MaxDelqEver",
+                "PercentTradesNeverDelq",
+            ],
+            False,
+        ),
+        (
+            "Credit activity / inquiries",
+            "How often you’ve recently applied for credit.",
+            [
+                "MSinceMostRecentInqexcl7days",
+                "NumInqLast6M",
+                "NumInqLast6Mexcl7days",
+            ],
+            False,
+        ),
+        (
+            "Accounts / trade counts and mix",
+            "How many accounts you have and what types of credit they represent.",
+            [
+                "NumTotalTrades",
+                "NumTradesOpeninLast12M",
+                "NumSatisfactoryTrades",
+                "PercentInstallTrades",
+            ],
+            False,
+        ),
+        (
+            "Utilization / balances",
+            "How much of your available credit you’re using and how many accounts carry balances.",
+            [
+                "NetFractionRevolvingBurden",
+                "NetFractionInstallBurden",
+                "NumRevolvingTradesWBalance",
+                "NumInstallTradesWBalance",
+                "NumBank2NatlTradesWHighUtilization",
+                "PercentTradesWBalance",
+            ],
+            False,
+        ),
+    ]
+
+    raw: dict[str, float] = {}
+
+    # Track which fields we render so we can safely catch any extras
+    rendered: set[str] = set()
+
+    for title, blurb, fields, expanded in FIELD_GROUPS:
+        # Only keep fields that actually exist in the model metadata
+        fields_in_model = [f for f in fields if f in raw_fields]
+        if not fields_in_model:
+            continue
+
+        with st.expander(f"{title} — {blurb}", expanded=expanded):
+            cols = st.columns(3)
+            for i, f in enumerate(fields_in_model):
+                rendered.add(f)
+                with cols[i % 3]:
+                    raw[f] = st.number_input(
+                        f,
+                        value=float(st.session_state.get(f"man_{f}", 0.0)),
+                        format="%.6f",
+                        key=f"man_{f}",
+                        help=(feature_desc.get(f) if isinstance(feature_desc, dict) else None),
+                    )
+
+    # If there are any fields in metadata that aren’t covered above, show them in an "Other" section
+    remaining = [f for f in raw_fields if f not in rendered]
+    if remaining:
+        with st.expander("Other / advanced — Additional fields used by the model", expanded=False):
+            cols = st.columns(3)
+            for i, f in enumerate(remaining):
+                with cols[i % 3]:
+                    raw[f] = st.number_input(
+                        f,
+                        value=float(st.session_state.get(f"man_{f}", 0.0)),
+                        format="%.6f",
+                        key=f"man_{f}",
+                        help=(feature_desc.get(f) if isinstance(feature_desc, dict) else None),
+                    )
+
+    return raw
+
+
+def upload_ui() -> pd.DataFrame | None:
+    st.subheader("Upload an Excel or CSV file containing your credit information")
+    st.caption("File must include the raw input columns. The app will score the first row.")
+    up = st.file_uploader("Upload file", type=["csv", "xlsx"])
+    if not up:
+        return None
+
+    if up.name.lower().endswith(".csv"):
+        df = pd.read_csv(up)
+    else:
+        df = pd.read_excel(up)
+
+    st.write("Preview:")
+    st.dataframe(df.head())
+
+    return df
+
+
+# ------------------------------------------------------------
+# Collect input
+# ------------------------------------------------------------
+raw_input_obj = None
+if mode == "Manual entry":
+    raw_input_obj = manual_entry_ui()
+else:
+    raw_input_obj = upload_ui()
+
+st.divider()
+
+# ------------------------------------------------------------
+# Score
+# ------------------------------------------------------------
+if st.button("Score Application", type="primary", disabled=(raw_input_obj is None)):
+    # Temporary progress UI (only visible while scoring runs)
+    _progress_slot = st.empty()
+    _progress = _progress_slot.progress(0.5)
+    try:
+        result = score_application(
+            raw_input=raw_input_obj,
+            pipeline=pipeline,
+            metadata=metadata,
+            feature_desc=feature_desc,
+            use_gemini=bool(gemini_api_key),
+            gemini_api_key=gemini_api_key,
+        )
+        _progress.progress(1.0)
+
+        p_bad = result["p_bad"]
+        threshold = result["threshold"]
+        decision = result["decision"]
+        label_1 = result["label_1"]
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric(f"P({label_1})", f"{p_bad:.4f}")
+        c2.metric("Threshold", f"{threshold:.4f}")
+        c3.metric("Decision", "DENY" if decision == "deny" else "FORWARD")
+
+        if decision == "deny":
+            st.error(result["decision_text"])
+        else:
+            st.success(result["decision_text"])
+
+        # If denied, show explanations
+        if decision == "deny":
+            gem_text = result.get("gemini_explanation")
+            st.subheader("Explanation of Denial")
+            if gem_text:
+                st.write(gem_text)
+            else:
+                st.warning("We couldn’t generate an explanation right now. Please try again.")
+
+    except Exception as e:
+        st.exception(e)
+    finally:
+        _progress_slot.empty()
