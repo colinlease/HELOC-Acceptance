@@ -46,7 +46,7 @@ The sidebar is always present and shows:
 - Decision logic:
   - `DENY` if `P(Bad) >= threshold`
   - `FORWARD` otherwise
-  - The current threshold is set to 0.7750 in order to reduce false negatives (denials of qualified borrowers)
+  - The current threshold is set to 0.7750 in order to reduce false positives (denials of qualified borrowers)
   - Given that loan officers will manually approve accepted applications, the model is skewed to only deny applicants if they are extremely unqualifies. 
 
 ## Explanations and diagnostics
