@@ -32,7 +32,6 @@ DROP_COLS = [
 
 # Gemini Flash 2.5
 USE_GEMINI = True  # set True when you want to call Gemini
-GEMINI_API_KEY = "AIzaSyBF5mkMbI95PWJarrWESol-zuOWikJvew8"  
 GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_ENDPOINT = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
@@ -460,3 +459,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
