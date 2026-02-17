@@ -134,8 +134,9 @@ def manual_entry_ui() -> dict:
                 with cols[i % 3]:
                     raw[f] = st.number_input(
                         f,
-                        value=float(st.session_state.get(f"man_{f}", 0.0)),
-                        format="%.6f",
+                        value=int(st.session_state.get(f"man_{f}", 0.0)),
+                        step=1,
+                        format="%d",
                         key=f"man_{f}",
                         help=(feature_desc.get(f) if isinstance(feature_desc, dict) else None),
                     )
@@ -149,8 +150,9 @@ def manual_entry_ui() -> dict:
                 with cols[i % 3]:
                     raw[f] = st.number_input(
                         f,
-                        value=float(st.session_state.get(f"man_{f}", 0.0)),
-                        format="%.6f",
+                        value=int(st.session_state.get(f"man_{f}", 0.0)),
+                        step=1,
+                        format="%d",
                         key=f"man_{f}",
                         help=(feature_desc.get(f) if isinstance(feature_desc, dict) else None),
                     )
