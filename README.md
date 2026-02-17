@@ -37,8 +37,9 @@ The sidebar is always present and shows:
 ## Model and decisioning
 
 ### Model type
-- The model is a **logistic regression classifier** wrapped in a scikit-learn **pipeline**.
+- The model is a **logistic regression classifier** with regularization, wrapped in a scikit-learn **pipeline**.
 - The model produces `P(Bad)` via `predict_proba(...)` (probability of the positive class).
+- Extensive data transformation was done before model training to handle special codes (-7,-8,-9) and one-hot encodings of categorical delinquency variables. 
 
 ### Decision rule
 - A constant threshold is read from metadata:
@@ -46,8 +47,8 @@ The sidebar is always present and shows:
 - Decision logic:
   - `DENY` if `P(Bad) >= threshold`
   - `FORWARD` otherwise
-  - The current threshold is set to 0.7750 in order to reduce false positives (denials of qualified borrowers)
-  - Given that loan officers will manually approve accepted applications, the model is skewed to only deny applicants if they are extremely unqualifies. 
+  - The current threshold is set to 0.7750 in order to reduce false positives (denials of qualified borrowers).
+  - Given that loan officers will manually approve accepted applications, the model is skewed to only deny applicants if they are extremely unqualified. 
 
 ## Explanations and diagnostics
 
