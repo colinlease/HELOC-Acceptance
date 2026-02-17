@@ -400,7 +400,7 @@ def score_application(
     decision_text = (
         f"{label_1} (1) -> reject automatically"
         if y_pred == 1
-        else f"{label_0} (0) -> approved for more officer review"
+        else f"{label_0} (0) -> Your application has recieved initial approval and will be forwarded to a loan officer for final review."
     )
 
     result = {
