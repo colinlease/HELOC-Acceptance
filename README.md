@@ -62,7 +62,7 @@ The sidebar is always present and shows:
 The backend returns an `admin_diagnostics` object in the scoring result, including:
 
 1) **Special codes**
-- `NoBureau` (0/1)
+- `NoBureau` (Yes/No)
 - `CountMinus7` (integer)
 - `CountMinus8` (integer)
 - If none are triggered, the UI shows: **"No special codes detected"**
