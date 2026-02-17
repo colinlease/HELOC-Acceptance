@@ -38,7 +38,7 @@ The sidebar is always present and shows:
 
 ### Model type
 - The model is a **logistic regression classifier** with L2 regularization (C=1), wrapped in a scikit-learn **pipeline**.
-- The hyperparameter C was tuned using extensive cross validation, and logistic regression was chosen over SVM, Random Forest and Neural Networks due to its comparable performance explainability. 
+- The hyperparameter C was tuned using extensive cross validation, and logistic regression was chosen over SVM, Random Forest and Neural Networks due to its comparable performance and superior explainability. 
 - The model produces `P(Bad)` via `predict_proba(...)` (probability of the positive class).
 - Extensive data transformation was done before model training to handle special codes (-7,-8,-9) and one-hot encodings of categorical delinquency variables. 
 
