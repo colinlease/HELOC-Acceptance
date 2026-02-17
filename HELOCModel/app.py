@@ -40,15 +40,38 @@ def get_artifacts():
 pipeline, metadata, feature_desc = get_artifacts()
 raw_fields = list(metadata["raw_input_features_order"])
 
+# Constant decision threshold from metadata (used by backend)
+DEFAULT_THRESHOLD = metadata.get("threshold_on_P(Bad)")
+
 # Gemini key from Streamlit secrets (preferred) or env var fallback
 gemini_api_key = None
 if "GEMINI_API_KEY" in st.secrets:
     gemini_api_key = st.secrets["GEMINI_API_KEY"]
 
 # ------------------------------------------------------------
+# Admin / Reviewer sidebar (for grading / diagnostics)
+# ------------------------------------------------------------
+st.sidebar.title("Admin / Reviewer Panel")
+st.sidebar.caption(
+    "Internal diagnostic information. "
+    "Not visible to applicants."
+)
+
+# Threshold / cutoff (populated after scoring)
+_admin_threshold_slot = st.sidebar.empty()
+if DEFAULT_THRESHOLD is not None:
+    _admin_threshold_slot.metric("Threshold / Cutoff", f"{float(DEFAULT_THRESHOLD):.4f}")
+else:
+    _admin_threshold_slot.metric("Threshold / Cutoff", "—")
+
+_admin_results_section = st.sidebar.empty()
+
+_admin_diagnostics_section = st.sidebar.empty()
+
+# ------------------------------------------------------------
 # Main-page input method selector (no sidebar)
 # ------------------------------------------------------------
-st.subheader("Step 1: Provide applicant data")
+st.subheader("Provide applicant data")
 mode = st.radio(
     "Input method",
     ["Upload CSV/XLSX", "Manual entry"],
@@ -258,14 +281,87 @@ if st.button("Score Application", type="primary", disabled=(raw_input_obj is Non
         _progress.progress(1.0)
 
         p_bad = result["p_bad"]
+        label_1 = result["label_1"]
+        with _admin_results_section.container():
+            st.subheader("Application Results")
+            st.metric(f"P({label_1})", f"{p_bad:.4f}")
+            st.metric("Decision", "DENY" if result["decision"] == "deny" else "FORWARD")
+            st.divider()
+
+        # Admin diagnostics (special codes + top contributors)
+        admin_diag = result.get("admin_diagnostics") or {}
+        special = admin_diag.get("special_codes") or {}
+        contributors = admin_diag.get("top_contributors") or []
+
+        with _admin_diagnostics_section.container():
+            # Special codes summary
+            st.subheader("Special Codes")
+            if special.get("detected"):
+                nb = "Yes" if int(special.get("NoBureau", 0)) else "No"
+                m7 = int(special.get("CountMinus7", 0))
+                m8 = int(special.get("CountMinus8", 0))
+                st.markdown(
+                    f"""
+                    <div style='line-height:1.2; margin:0; padding:0;'>
+                      <div style='margin:0; padding:0;'>NoBureau: {nb}</div>
+                      <div style='margin:0; padding:0;'>-7 codes: {m7}</div>
+                      <div style='margin:0; padding:0;'>-8 codes: {m8}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.write("No special codes detected")
+
+            st.divider()
+            # Top Contributors
+            st.subheader("Top Contributors")
+            if contributors:
+                # Scale bars by absolute contribution for a simple visual cue
+                abs_vals = [abs(float(c.get("contribution_to_logit", 0.0))) for c in contributors]
+                max_abs = max(abs_vals) if abs_vals else 0.0
+
+                for i, c in enumerate(contributors, start=1):
+                    fname = str(c.get("feature", ""))
+                    desc = str(c.get("description", ""))
+                    contrib = float(c.get("contribution_to_logit", 0.0))
+                    direction = str(c.get("direction", ""))
+
+                    risk_text = "Increased risk" if direction == "toward_bad" else "Reduced risk"
+
+                    desc_line = (
+                        f"<div style='margin:0; padding:0; line-height:1.2; color: rgba(49, 51, 63, 0.8); font-size: 0.85rem;'>{desc}</div>"
+                        if desc else ""
+                    )
+                    risk_line = (
+                        f"<div style='margin:0; padding:0; line-height:1.2; color: rgba(49, 51, 63, 0.8); font-size: 0.85rem;'>{risk_text}</div>"
+                    )
+                    contrib_line = (
+                        f"<div style='margin:0; padding:0; line-height:1.2; color: rgba(49, 51, 63, 0.8); font-size: 0.85rem;'>Contribution: {contrib:+.4f}</div>"
+                    )
+
+                    st.markdown(
+                        f"""
+                        <div style='margin-bottom: 0.6rem; padding-left: 0.5rem; border-left: 3px solid rgba(49, 51, 63, 0.20);'>
+                          <div style='margin:0; padding:0; line-height:1.2; font-weight:600; color: rgba(49, 51, 63, 0.70);'>{fname}</div>
+                          {desc_line}
+                          {risk_line}
+                          {contrib_line}
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+            else:
+                st.write("Contributor details unavailable.")
+
         threshold = result["threshold"]
+        _admin_threshold_slot.metric("Threshold / Cutoff", f"{threshold:.4f}")
         decision = result["decision"]
         label_1 = result["label_1"]
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric(f"P({label_1})", f"{p_bad:.4f}")
-        c2.metric("Threshold", f"{threshold:.4f}")
-        c3.metric("Decision", "DENY" if decision == "deny" else "FORWARD")
+        c1, _spacer = st.columns([1, 2])
+        c1.metric("Decision", "DENY" if decision == "deny" else "FORWARD")
 
         if decision == "deny":
             st.error(result["decision_text"])
