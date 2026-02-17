@@ -409,8 +409,9 @@ def call_gemini_flash(explanation_package: dict, gemini_api_key: Optional[str] =
         "role": "You are a loan decision assistant. Your job is to explain THIS specific denial using ONLY the provided inputs.",
         "task": (
             "Write a borrower-friendly denial explanation grounded in the provided inputs. "
-            "Identify the 2–4 most important reasons this application was denied, using the actual fields and values. "
+            "Identify the 2–3 most important reasons this application was denied, using the actual fields and values. "
             "Then give 3 tailored next-step suggestions that directly correspond to those reasons."
+            "Do NOT reference the actual field names, use consumer-friendly language to explain why the application was denied."
         ),
         "inputs": explanation_package,
         "output_requirements": {
@@ -418,12 +419,11 @@ def call_gemini_flash(explanation_package: dict, gemini_api_key: Optional[str] =
             "format": [
             "One short paragraph summarizing the decision",
             "Then a section titled 'Main reasons' with 2–4 bullets",
-            "Then a section titled 'What you can do next' with exactly 3 bullets"
+            "Then a section titled 'What you can do next' with 2-4 bullets"
             ]
         },
         "hard_rules": [
             "Use ONLY the provided inputs. Do not invent facts or assume missing information.",
-            "Each 'Main reasons' bullet must reference at least one specific field name AND value (or a special code explanation).",
             "If NoBureau=1 or CountMinus7/8>0, explicitly say the credit file appears thin/insufficient.",
             "Do not mention protected traits. Do not guarantee approval."
         ],
