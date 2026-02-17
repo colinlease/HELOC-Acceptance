@@ -390,20 +390,48 @@ def call_gemini_flash(explanation_package: dict, gemini_api_key: Optional[str] =
     if not api_key:
         raise ValueError("Gemini API key missing. Set GEMINI_API_KEY env var or Streamlit secrets.")
 
+    # prompt = {
+    #     "task": "Explain why this HELOC borrower had their loan rejected, and suggest ways for them to improve their credit. Use specific information from their application to determine their specific reasons for rejection and provide tailored suggestions.",
+    #     "style": "brief and applicant friendly",
+    #     "inputs": explanation_package,
+    #     "output_requirements": {
+    #         "length": "120 to 200 words",
+    #         "format": "one short paragraph, then 3 bullet suggestions",
+    #     },
+    #     "constraints": [
+    #         "Do not mention protected traits.",
+    #         "Do not guarantee approval.",
+    #         "Keep it practical and action focused.",
+    #     ],
+    # } 
+
     prompt = {
-        "task": "Explain rejection and suggest improvements",
-        "style": "brief and applicant friendly",
+        "role": "You are a loan decision assistant. Your job is to explain THIS specific denial using ONLY the provided inputs.",
+        "task": (
+            "Write a borrower-friendly denial explanation grounded in the provided inputs. "
+            "Identify the 2–4 most important reasons this application was denied, using the actual fields and values. "
+            "Then give 3 tailored next-step suggestions that directly correspond to those reasons."
+        ),
         "inputs": explanation_package,
         "output_requirements": {
-            "length": "120 to 200 words",
-            "format": "one short paragraph, then 3 bullet suggestions",
+            "length": "120 to 180 words",
+            "format": [
+            "One short paragraph summarizing the decision",
+            "Then a section titled 'Main reasons' with 2–4 bullets",
+            "Then a section titled 'What you can do next' with exactly 3 bullets"
+            ]
         },
-        "constraints": [
-            "Do not mention protected traits.",
-            "Do not guarantee approval.",
-            "Keep it practical and action focused.",
+        "hard_rules": [
+            "Use ONLY the provided inputs. Do not invent facts or assume missing information.",
+            "Each 'Main reasons' bullet must reference at least one specific field name AND value (or a special code explanation).",
+            "If NoBureau=1 or CountMinus7/8>0, explicitly say the credit file appears thin/insufficient.",
+            "Do not mention protected traits. Do not guarantee approval."
         ],
-    }
+        "style": {
+            "tone": "plain English, applicant-friendly, specific",
+            "avoid": ["generic advice not linked to a reason", "jargon like 'log-odds'"]
+        }
+        }
 
     body = {
         "contents": [{"role": "user", "parts": [{"text": json.dumps(prompt, ensure_ascii=False)}]}]
