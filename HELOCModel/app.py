@@ -187,7 +187,7 @@ def upload_ui() -> pd.DataFrame | None:
     template_path = Path(__file__).resolve().parent / "raw_input_template.xlsx"
     example_path = Path(__file__).resolve().parent / "raw_input_filled.xlsx"
 
-    c_dl1, c_dl2, _spacer = st.columns([1, 1, 8])
+    c_dl1, c_dl2, _spacer = st.columns([1, 1, 7])
 
     with c_dl1:
         if template_path.exists():
