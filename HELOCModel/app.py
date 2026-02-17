@@ -1,5 +1,6 @@
 # app.py
 from __future__ import annotations
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -7,7 +8,27 @@ import streamlit as st
 from backend import load_artifacts, score_application
 
 st.set_page_config(page_title="HELOC DSS", layout="wide")
+
 st.title("HELOC Automated Application Portal")
+# Make download buttons look like hyperlinks
+st.markdown(
+    """
+    <style>
+      .stDownloadButton > button {
+        background: none !important;
+        border: none !important;
+        padding: 0 !important;
+        color: #1f77b4 !important;
+        text-decoration: underline !important;
+        font-weight: 400 !important;
+      }
+      .stDownloadButton > button:hover {
+        color: #0f5c8c !important;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ------------------------------------------------------------
 # Cache model artifacts
@@ -162,7 +183,36 @@ def manual_entry_ui() -> dict:
 
 def upload_ui() -> pd.DataFrame | None:
     st.subheader("Upload an Excel or CSV file containing your credit information")
-    st.caption("File must include the raw input columns. The app will score the first row.")
+    # Allow users to download the Excel template and an example filled template
+    template_path = Path(__file__).resolve().parent / "raw_input_template.xlsx"
+    example_path = Path(__file__).resolve().parent / "raw_input_filled.xlsx"
+
+    c_dl1, c_dl2, _spacer = st.columns([1, 1, 8])
+
+    with c_dl1:
+        if template_path.exists():
+            template_bytes = template_path.read_bytes()
+            st.download_button(
+                label="Download template file",
+                data=template_bytes,
+                file_name="raw_input_template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        else:
+            st.info("Template file is not available right now.")
+
+    with c_dl2:
+        if example_path.exists():
+            example_bytes = example_path.read_bytes()
+            st.download_button(
+                label="Download example template",
+                data=example_bytes,
+                file_name="raw_input_filled.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        else:
+            st.info("Example file is not available right now.")
+    st.caption("Download the template above and fill in your credit information.")
     up = st.file_uploader("Upload file", type=["csv", "xlsx"])
     if not up:
         return None
