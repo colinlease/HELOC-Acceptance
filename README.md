@@ -38,7 +38,7 @@ The sidebar is always present and shows:
 
 ### Model type
 - The model is a **logistic regression classifier** with L2 regularization (C=1), wrapped in a scikit-learn **pipeline**.
-- The hyperparameter C was tuned using extensive cross validation, and logistic regression was chosen over SVM, Random Forest and Neural Networks due to its comparable performance and superior explainability. 
+- The hyperparameter C was tuned using cross validation, and logistic regression was chosen over SVM, Random Forest and Neural Networks due to its comparable performance and superior explainability. 
 - The model produces `P(Bad)` via `predict_proba(...)` (probability of the positive class).
 - Extensive data transformation was done before model training to handle special codes (-7,-8,-9) and one-hot encodings of categorical delinquency variables. 
 
@@ -49,7 +49,7 @@ The sidebar is always present and shows:
   - `DENY` if `P(Bad) >= threshold`
   - `FORWARD` otherwise
   - The current threshold is set to 0.7750 in order to reduce false positives (denials of qualified borrowers).
-  - Given that loan officers will manually approve accepted applications, the model is skewed to only deny applicants if they are extremely unqualified. 
+  - Given that loan officers will manually approve accepted applications, the model is skewed to only deny applicants if they are extremely unqualified, leading to a false positive rate of 5%. 
 
 ## Explanations and diagnostics
 
