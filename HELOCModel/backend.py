@@ -295,6 +295,93 @@ def build_rejection_package(
     }
 
 
+def build_admin_diagnostics(
+    pipeline,
+    X_manip_one: pd.DataFrame,
+    expected_manip_features: List[str],
+    feature_desc: Dict[str, str],
+    drop_cols: List[str],
+    decision: str,
+    top_k: int = 5,
+) -> dict:
+    """Builds internal diagnostics for grading/admin display.
+
+    Includes:
+      - NoBureau / CountMinus7 / CountMinus8 special-code summary
+      - Top-k feature contributions aligned to the decision:
+          * decision == 'deny'    -> strongest drivers toward Bad (largest positive contributions)
+          * decision == 'forward' -> strongest drivers toward Good (most negative contributions)
+
+    Notes: contribution_to_logit = coef * x_preprocessed.
+    Positive contributions push toward the model's positive class (Bad).
+    Negative contributions push toward Good.
+    """
+    # --- Special code summary (from manipulated features) ---
+    def _safe_float(col: str) -> float:
+        if col in X_manip_one.columns:
+            v = X_manip_one.iloc[0][col]
+            if pd.isna(v):
+                return 0.0
+            return float(v)
+        return 0.0
+
+    no_bureau = int(_safe_float("NoBureau") > 0)
+    count_m7 = int(round(_safe_float("CountMinus7")))
+    count_m8 = int(round(_safe_float("CountMinus8")))
+
+    if (no_bureau == 0) and (count_m7 == 0) and (count_m8 == 0):
+        special_codes_message = "No special codes detected"
+        special_codes_detected = False
+    else:
+        special_codes_detected = True
+        parts = []
+        parts.append(f"NoBureau: {'Yes' if no_bureau else 'No'}")
+        parts.append(f"-7 codes: {count_m7}")
+        parts.append(f"-8 codes: {count_m8}")
+        special_codes_message = " | ".join(parts)
+
+    # --- Contribution list aligned to decision ---
+    feature_names = [c for c in expected_manip_features if c not in drop_cols]
+    contrib_df = compute_feature_contributions(pipeline, X_manip_one, feature_names)
+
+    if decision == "deny":
+        # Largest positive contributions push toward Bad
+        picked = contrib_df.sort_values("contribution_to_logit", ascending=False).head(top_k)
+        direction = "toward_bad"
+    else:
+        # Most negative contributions push toward Good
+        picked = contrib_df.sort_values("contribution_to_logit", ascending=True).head(top_k)
+        direction = "toward_good"
+
+    top_contributors: List[dict] = []
+    for _, row in picked.iterrows():
+        fname = str(row["feature"])
+        top_contributors.append(
+            {
+                "feature": fname,
+                "description": feature_desc.get(fname, ""),
+                "coef": float(row["coef"]),
+                "contribution_to_logit": float(row["contribution_to_logit"]),
+                "direction": direction,
+            }
+        )
+
+    return {
+        "special_codes": {
+            "NoBureau": no_bureau,
+            "CountMinus7": count_m7,
+            "CountMinus8": count_m8,
+            "detected": special_codes_detected,
+            "message": special_codes_message,
+        },
+        "top_contributors": top_contributors,
+        "notes": [
+            "Internal diagnostics for grading/troubleshooting.",
+            "Feature contributions are coef * preprocessed_value (logit space).",
+        ],
+    }
+
+
 # ------------------------------------------------------------
 # Gemini call (NO hardcoded key)
 # ------------------------------------------------------------
@@ -398,20 +485,32 @@ def score_application(
     y_pred = 1 if p_bad >= threshold else 0
 
     decision_text = (
-        f"{label_1} (1) -> reject automatically"
+        "Unfortunately, we are not able to approve your application at this time."
         if y_pred == 1
-        else f"{label_0} (0) -> Your application has recieved initial approval and will be forwarded to a loan officer for final review."
+        else "Your application has received initial approval and will be forwarded to a loan officer for final review."
     )
+
+    decision = "deny" if y_pred == 1 else "forward"
 
     result = {
         "p_bad": p_bad,
         "threshold": threshold,
         "y_pred": y_pred,
-        "decision": "deny" if y_pred == 1 else "forward",
+        "decision": decision,
         "decision_text": decision_text,
         "label_0": label_0,
         "label_1": label_1,
     }
+
+    result["admin_diagnostics"] = build_admin_diagnostics(
+        pipeline=pipeline,
+        X_manip_one=X_manip_one,
+        expected_manip_features=expected_manip_features,
+        feature_desc=feature_desc,
+        drop_cols=DROP_COLS,
+        decision=decision,
+        top_k=5,
+    )
 
     if y_pred == 1:
         package = build_rejection_package(
