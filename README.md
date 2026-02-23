@@ -96,6 +96,8 @@ The backend returns an `admin_diagnostics` object in the scoring result, includi
   - Loads saved logit model and transforms an applicant's scores to determine the application decision
 - `HELOCModel/Log Model Output.py`
   - Original model training and metadata aggragation
+- `HELOCModel/Model Selection.py`
+  - Comparison of candidate models
 - `HELOCModel/raw_input_template.xlsx`
   - Downloadable template used for uploads
 - `HELOCModel/raw_input_filled.xlsx`
