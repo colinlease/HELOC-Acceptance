@@ -124,6 +124,69 @@ def raw_to_manipulated(
         if k in out:
             out[k] = v
 
+    # --------------------------------------------------------
+    # One-hot encoding for categorical base fields
+    # --------------------------------------------------------
+    # The trained model expects dummy columns like:
+    #   MaxDelq2PublicRecLast12M_7.0, MaxDelq2PublicRecLast12M_0.0, MaxDelq2PublicRecLast12M_nan
+    # and the base column (e.g., MaxDelq2PublicRecLast12M) is dropped.
+    # If we don't explicitly set these dummies at inference time, they remain NaN and are
+    # imputed/scaled, which can produce misleading "top contributors".
+
+    def _set_one_hot_from_raw(base_name: str) -> None:
+        # Collect all expected dummy columns for this base feature
+        prefix = f"{base_name}_"
+        dummy_cols = [c for c in expected_manip_features if c.startswith(prefix)]
+        if not dummy_cols:
+            return
+
+        # Initialize all related dummies to 0 (only if they exist in out)
+        for c in dummy_cols:
+            out[c] = 0.0
+
+        raw_val = raw.get(base_name, np.nan)
+
+        # Missing -> set *_nan if present
+        if pd.isna(raw_val):
+            nan_col = f"{base_name}_nan"
+            if nan_col in out:
+                out[nan_col] = 1.0
+            return
+
+        # Special codes (-7/-8) -> treat as missing for the base categorical
+        if raw_val in (-7, -8):
+            nan_col = f"{base_name}_nan"
+            if nan_col in out:
+                out[nan_col] = 1.0
+            return
+
+        # Match numeric dummy naming convention used in training (e.g., 7.0)
+        try:
+            raw_num = float(raw_val)
+        except Exception:
+            nan_col = f"{base_name}_nan"
+            if nan_col in out:
+                out[nan_col] = 1.0
+            return
+
+        candidate = f"{base_name}_{raw_num:.1f}"
+        if candidate in out:
+            out[candidate] = 1.0
+        else:
+            # Fallback: if training happened to store as integer-like string
+            candidate2 = f"{base_name}_{int(raw_num)}.0"
+            if candidate2 in out:
+                out[candidate2] = 1.0
+            else:
+                # If no matching dummy exists, mark as missing if *_nan exists
+                nan_col = f"{base_name}_nan"
+                if nan_col in out:
+                    out[nan_col] = 1.0
+
+    # Apply to known base categorical fields used in training
+    _set_one_hot_from_raw("MaxDelq2PublicRecLast12M")
+    _set_one_hot_from_raw("MaxDelqEver")
+
     # Special codes -7 and -8
     for raw_col, v in raw.items():
         flag7 = f"{raw_col}_is_m7"
