@@ -1,4 +1,5 @@
-# backend.py
+# backend.py  - HELOC Application Portal Backend
+
 from __future__ import annotations
 
 import json
@@ -11,13 +12,11 @@ import pandas as pd
 import joblib
 import requests
 
-
-# ------------------------------------------------------------
 # Paths (works locally + on Streamlit Cloud)
 # Put artifacts either:
 #   (A) in same folder as backend.py  OR
 #   (B) in ./artifacts/
-# ------------------------------------------------------------
+
 BASE_DIR = Path(__file__).resolve().parent
 ARTIFACT_DIR = (BASE_DIR / "artifacts") if (BASE_DIR / "artifacts").exists() else BASE_DIR
 
@@ -38,10 +37,7 @@ DROP_COLS = [
 GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_ENDPOINT = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
-
-# ------------------------------------------------------------
 # Metadata and dictionary helpers
-# ------------------------------------------------------------
 def load_metadata_required(meta_path: Path) -> dict:
     if not meta_path.exists():
         raise FileNotFoundError(f"Metadata file not found: {meta_path}")
@@ -93,10 +89,7 @@ def load_feature_dictionary(dict_path: Path) -> Dict[str, str]:
 
     return mapping
 
-
-# ------------------------------------------------------------
 # RAW -> MANIPULATED transformation
-# ------------------------------------------------------------
 def raw_to_manipulated(
     raw_row: pd.DataFrame,
     expected_manip_features: List[str],
@@ -190,9 +183,7 @@ def raw_to_manipulated(
     return df_out
 
 
-# ------------------------------------------------------------
 # Coefficient based reasons and suggestions
-# ------------------------------------------------------------
 def get_logreg_coefficients(pipeline) -> Tuple[np.ndarray, float]:
     clf = pipeline.named_steps.get("clf", None)
     if clf is None or not hasattr(clf, "coef_"):
@@ -304,7 +295,7 @@ def build_admin_diagnostics(
     decision: str,
     top_k: int = 5,
 ) -> dict:
-    """Builds internal diagnostics for grading/admin display.
+    """Builds internal diagnostics for admin display.
 
     Includes:
       - NoBureau / CountMinus7 / CountMinus8 special-code summary
@@ -382,28 +373,11 @@ def build_admin_diagnostics(
     }
 
 
-# ------------------------------------------------------------
 # Gemini call (NO hardcoded key)
-# ------------------------------------------------------------
 def call_gemini_flash(explanation_package: dict, gemini_api_key: Optional[str] = None) -> str:
     api_key = (gemini_api_key or os.getenv("GEMINI_API_KEY", "")).strip()
     if not api_key:
         raise ValueError("Gemini API key missing. Set GEMINI_API_KEY env var or Streamlit secrets.")
-
-    # prompt = {
-    #     "task": "Explain why this HELOC borrower had their loan rejected, and suggest ways for them to improve their credit. Use specific information from their application to determine their specific reasons for rejection and provide tailored suggestions.",
-    #     "style": "brief and applicant friendly",
-    #     "inputs": explanation_package,
-    #     "output_requirements": {
-    #         "length": "120 to 200 words",
-    #         "format": "one short paragraph, then 3 bullet suggestions",
-    #     },
-    #     "constraints": [
-    #         "Do not mention protected traits.",
-    #         "Do not guarantee approval.",
-    #         "Keep it practical and action focused.",
-    #     ],
-    # } 
 
     prompt = {
         "role": "You are a loan decision assistant. Your job is to explain THIS specific denial using ONLY the provided inputs.",
@@ -425,7 +399,8 @@ def call_gemini_flash(explanation_package: dict, gemini_api_key: Optional[str] =
         "hard_rules": [
             "Use ONLY the provided inputs. Do not invent facts or assume missing information.",
             "If NoBureau=1 or CountMinus7/8>0, explicitly say the credit file appears thin/insufficient.",
-            "Do not mention protected traits. Do not guarantee approval."
+            "Do not mention protected traits. Do not guarantee approval.",
+            "Do not reference the actual field names in your answer, explain in plain language why the application was denied."
         ],
         "style": {
             "tone": "plain English, applicant-friendly, specific",
@@ -454,10 +429,7 @@ def call_gemini_flash(explanation_package: dict, gemini_api_key: Optional[str] =
     except Exception:
         return json.dumps(data, indent=2, ensure_ascii=False)
 
-
-# ------------------------------------------------------------
 # Artifact loading (cache this in Streamlit)
-# ------------------------------------------------------------
 def load_artifacts() -> Tuple[Any, dict, Dict[str, str]]:
     if not MODEL_JOBLIB.exists():
         raise FileNotFoundError(f"Model joblib not found: {MODEL_JOBLIB}")
@@ -471,9 +443,7 @@ def load_artifacts() -> Tuple[Any, dict, Dict[str, str]]:
     return pipeline, metadata, feature_desc
 
 
-# ------------------------------------------------------------
 # Streamlit-friendly scoring entry point
-# ------------------------------------------------------------
 def score_application(
     raw_input: Union[Dict[str, Any], pd.DataFrame],
     pipeline: Any,
