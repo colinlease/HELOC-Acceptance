@@ -1,4 +1,5 @@
-# app.py
+# app.py - Streamlit HELOC Application Portal Frontend
+
 from __future__ import annotations
 from pathlib import Path
 
@@ -30,9 +31,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ------------------------------------------------------------
 # Cache model artifacts
-# ------------------------------------------------------------
 @st.cache_resource
 def get_artifacts():
     return load_artifacts()
@@ -48,9 +47,8 @@ gemini_api_key = None
 if "GEMINI_API_KEY" in st.secrets:
     gemini_api_key = st.secrets["GEMINI_API_KEY"]
 
-# ------------------------------------------------------------
-# Admin / Reviewer sidebar (for grading / diagnostics)
-# ------------------------------------------------------------
+
+# Admin / Reviewer sidebar 
 st.sidebar.title("Admin / Reviewer Panel")
 st.sidebar.caption(
     "Internal diagnostic information. "
@@ -68,9 +66,7 @@ _admin_results_section = st.sidebar.empty()
 
 _admin_diagnostics_section = st.sidebar.empty()
 
-# ------------------------------------------------------------
-# Main-page input method selector (no sidebar)
-# ------------------------------------------------------------
+# Main-page input method selector 
 st.subheader("Provide applicant data")
 mode = st.radio(
     "Input method",
@@ -85,10 +81,7 @@ if not gemini_api_key:
         "You can still score applications."
     )
 
-
-# ------------------------------------------------------------
 # Input builders
-# ------------------------------------------------------------
 def manual_entry_ui() -> dict:
     st.subheader("Enter your credit information manually")
     st.caption("Enter raw values exactly as the template expects. Special codes like -7, -8, -9 are allowed.")
@@ -162,7 +155,6 @@ def manual_entry_ui() -> dict:
 
     raw: dict[str, float] = {}
 
-    # Track which fields we render so we can safely catch any extras
     rendered: set[str] = set()
 
     for title, blurb, fields, expanded in FIELD_GROUPS:
@@ -251,9 +243,8 @@ def upload_ui() -> pd.DataFrame | None:
     return df
 
 
-# ------------------------------------------------------------
-# Collect input
-# ------------------------------------------------------------
+
+# Collect inputs
 raw_input_obj = None
 if mode == "Manual entry":
     raw_input_obj = manual_entry_ui()
@@ -262,9 +253,7 @@ else:
 
 st.divider()
 
-# ------------------------------------------------------------
 # Score
-# ------------------------------------------------------------
 if st.button("Score Application", type="primary", disabled=(raw_input_obj is None)):
     # Temporary progress UI (only visible while scoring runs)
     _progress_slot = st.empty()
