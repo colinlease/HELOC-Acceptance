@@ -124,14 +124,10 @@ def raw_to_manipulated(
         if k in out:
             out[k] = v
 
-    # --------------------------------------------------------
+    
     # One-hot encoding for categorical base fields
-    # --------------------------------------------------------
     # The trained model expects dummy columns like:
-    #   MaxDelq2PublicRecLast12M_7.0, MaxDelq2PublicRecLast12M_0.0, MaxDelq2PublicRecLast12M_nan
-    # and the base column (e.g., MaxDelq2PublicRecLast12M) is dropped.
-    # If we don't explicitly set these dummies at inference time, they remain NaN and are
-    # imputed/scaled, which can produce misleading "top contributors".
+    #   MaxDelq2PublicRecLast12M_7.0, MaxDelq2PublicRecLast12M_0.0 etc.
 
     def _set_one_hot_from_raw(base_name: str) -> None:
         # Collect all expected dummy columns for this base feature
